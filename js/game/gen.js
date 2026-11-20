@@ -291,6 +291,12 @@
       : ['pic', 'word', 'picmatch', 'match', 'listen', 'pic', 'match', 'word'];
   }
 
+  /* 这个字还没在任何题目里出现过 */
+  function firstMeet(ch) {
+    var a = g.ZStore && g.ZStore.data && g.ZStore.data.appear;
+    return !a || !a[ch];
+  }
+
   function lessonM1(chars, withPinyin, phase) {
     var types = typeList(phase || 3, withPinyin);
     var qs = [];
@@ -298,6 +304,10 @@
       var it = BY[ch];
       if (!it) return;
       var order = types.slice(i % types.length).concat(types);
+      /* 第一次见面且有图：强制先出看图题。
+         否则这个字可能被排到「听词选字」这种纯文字题位上，
+         配好的图一辈子都不会出现在孩子眼前。 */
+      if (hasImg(ch) && firstMeet(ch) && order[0] !== 'pic') order.unshift('pic');
       for (var k = 0; k < order.length; k++) {
         var t = order[k], o = null;
         if (t === 'listen') o = qListen(it);
