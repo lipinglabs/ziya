@@ -9,7 +9,7 @@
       created: Date.now(),
       chars: {},
       days: {},
-      settings: { pinyin: false, muted: false },
+      settings: { pinyin: false, muted: false, age: '4' },
       m2: { right: 0, wrong: 0, plays: 0 }
     };
   }
@@ -21,7 +21,8 @@
         var raw = localStorage.getItem(KEY);
         S.data = raw ? JSON.parse(raw) : blank();
       } catch (e) { S.data = blank(); }
-      if (!S.data.settings) S.data.settings = { pinyin: false, muted: false };
+      if (!S.data.settings) S.data.settings = { pinyin: false, muted: false, age: '4' };
+      if (!S.data.settings.age) S.data.settings.age = '4';
       if (!S.data.days) S.data.days = {};
       if (!S.data.chars) S.data.chars = {};
       return S.data;

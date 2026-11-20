@@ -376,3 +376,51 @@ input:checked + .sw::after { transform: translateX(20px); }
   opacity: 0; transition: opacity .25s ease;
 }
 .spresult.show { opacity: 1; }
+
+/* ---------- 地图 ---------- */
+.map { display: flex; flex-direction: column; gap: 14px; }
+.map h1 { font-size: 20px; font-weight: 500; margin: 0; }
+.mgrid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.mtile {
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+  padding: 12px 12px 10px; text-align: left;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.mtile:active { transform: scale(.98); }
+.mtile b { font-size: 15px; font-weight: 500; }
+.mtile.full b { color: var(--teal); }
+.mnum { font-size: 11px; color: var(--muted); }
+.mbar { display: block; height: 4px; border-radius: 2px; background: #EFE7DA; overflow: hidden; }
+.mbar em { display: block; height: 100%; background: var(--teal); border-radius: 2px; }
+.mtile.full .mbar em { background: var(--amber); }
+
+/* 分段选择器 */
+.seg { display: flex; gap: 6px; margin-bottom: 6px; }
+.seg button {
+  flex: 1; padding: 9px 0; border-radius: 11px; font-size: 14px;
+  border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+}
+.seg button.on { background: var(--teal); color: #fff; border-color: var(--teal); }
+
+/* ---------- 字卡 ---------- */
+.cards { display: flex; flex-direction: column; gap: 12px; }
+.pgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.pcard {
+  background: #fff; border: 1px solid var(--line); border-radius: 12px;
+  padding: 8px 6px 6px; display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.pc-img { width: 100%; aspect-ratio: 1/1; object-fit: cover; border-radius: 8px; }
+.pc-img.blank { background: var(--paper); }
+.pc-char { font-family: var(--kai); font-size: 30px; line-height: 1.2; }
+.pc-py { font-size: 12px; color: var(--muted); }
+
+@media print {
+  body { background: #fff; }
+  #stage { max-width: none; padding: 0; }
+  .navrow, .row-btns, .footbtns { display: none !important; }
+  .pgrid { grid-template-columns: repeat(4, 1fr); gap: 6mm; }
+  .pcard { break-inside: avoid; border: 1px dashed #999; border-radius: 6px; padding: 4mm 2mm; }
+  .pc-char { font-size: 46pt; }
+  .pc-py { font-size: 10pt; color: #555; }
+  .pc-img { width: 26mm; height: 26mm; }
+}

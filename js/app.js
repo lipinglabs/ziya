@@ -2,6 +2,14 @@
    设计约束：4 岁，不识字也能玩；单次 12 分钟；错题不惩罚，只重听。 */
 (function (g) {
   var D = g.ZIYA_DATA, S = g.ZStore, SRS = g.ZSRS, A = g.ZYAudio, Gen = g.ZYGen;
+
+  /* 年龄档位只决定「默认打开哪些能力」，不锁内容 —— 家长随时可改 */
+  var AGES = {
+    '4': { label: '4 岁', pinyin: false, readMax: 5, note: '识字 + 语音意识' },
+    '5': { label: '5 岁', pinyin: true, readMax: 7, note: '+ 拼音 + 短句' },
+    '6': { label: '6 岁', pinyin: true, readMax: 99, note: '全部解锁' }
+  };
+  function ageCfg() { return AGES[S.data.settings.age] || AGES['4']; }
   var PH = g.ZYPhonics, PY = g.ZPY;
   var TIME_LIMIT = 12 * 60 * 1000;
   var stage = null;
@@ -47,6 +55,8 @@
       '<button class="big" data-act="go" data-mod="m2">' +
       '<span class="glyph">听</span><span class="lbl">听音游戏</span>' +
       '<span class="sub">押韵 · 声调 · 音节</span></button>' +
+      '<button class="big" data-act="map"><span class="glyph">图</span><span class="lbl">地图</span>' +
+      '<span class="sub">31 个主题 · 挑一组练</span></button>' +
       (S.data.settings.pinyin
         ? '<button class="big" data-act="m3"><span class="glyph">拼</span><span class="lbl">拼音</span>' +
           '<span class="sub">63 个符号 · 拼一拼</span></button>'
@@ -179,6 +189,13 @@
       '<div class="card"><h3>错字榜</h3><div class="chips">' + mis + '</div></div>' +
       '<div class="card"><h3>近 7 天（分钟）</h3><div class="chart">' + chart + '</div></div>' +
       '<div class="card"><h3>设置</h3>' +
+      '<div class="row"><span>年龄档</span></div>' +
+      '<div class="seg" id="seg-age">' +
+      ['4', '5', '6'].map(function (a) {
+        return '<button data-age="' + a + '"' +
+          (S.data.settings.age === a ? ' class="on"' : '') + '>' + AGES[a].label + '</button>';
+      }).join('') + '</div>' +
+      '<p class="tiny">' + ageCfg().note + '。档位只改默认开关，不锁内容。</p>' +
       '<label class="row"><span>拼音解锁</span>' +
       '<input type="checkbox" id="sw-pinyin"' + (S.data.settings.pinyin ? ' checked' : '') + '>' +
       '<i class="sw"></i></label>' +
@@ -193,8 +210,51 @@
       '<input type="file" id="f-import" accept="application/json" hidden>' +
       '<button class="ghost danger" data-act="reset">清空</button>' +
       '</div><p class="tiny">换设备前先导出，新设备导入即可继续。</p></div>' +
-      '<p class="tiny center">字芽 v0.1 · 300 字 · 本地存储</p>' +
+      '<p class="tiny center">字芽 v0.4 · ' + D.items.length + ' 字 · ' + Object.keys(g.ZY_IMG || {}).length +
+      ' 图 · 本地存储</p>' +
       '</section>';
+  }
+
+  /* ---------------- 字卡（可打印） ---------------- */
+  function viewCards() {
+    var learned = D.items.filter(function (it) {
+      var r = S.data.chars[it.c];
+      return r && r.lvl >= 1;
+    });
+    var list = learned.length ? learned : D.items.slice(0, 24);
+    var tiles = list.map(function (it) {
+      var img = Gen.hasImg(it.c)
+        ? '<img class="pc-img" src="img/' + Gen.imgKey(it.c) + '" alt="">'
+        : '<span class="pc-img blank"></span>';
+      return '<div class="pcard">' + img +
+        '<span class="pc-char">' + it.c + '</span>' +
+        '<span class="pc-py">' + it.p + '</span></div>';
+    }).join('');
+    return '<section class="cards">' +
+      '<div class="row-btns"><button class="ghost" data-act="print">打印 / 存成 PDF</button>' +
+      '<span class="tiny">' + list.length + ' 张 · ' + (learned.length ? '已学过的字' : '尚未开始，先给你前 24 张') + '</span></div>' +
+      '<div class="pgrid">' + tiles + '</div></section>';
+  }
+
+  /* ---------------- 地图 ---------------- */
+  function viewMap() {
+    var tiles = D.groups.map(function (gr, i) {
+      var n = gr.chars.length;
+      var got = gr.chars.filter(function (it) {
+        var r = S.data.chars[it.c];
+        return r && r.lvl >= 1;
+      }).length;
+      var pct = Math.round(got / n * 100);
+      return '<button class="mtile' + (got === n ? ' full' : '') + '" data-act="mg" data-g="' + i + '">' +
+        '<b>' + gr.theme + '</b>' +
+        '<span class="mnum">' + got + '/' + n + '</span>' +
+        '<i class="mbar"><em style="width:' + pct + '%"></em></i>' +
+        '</button>';
+    }).join('');
+    return '<section class="map">' +
+      '<h1>地图</h1>' +
+      '<p class="lede">31 个主题、' + D.items.length + ' 个字。点一组就练这一组。</p>' +
+      '<div class="mgrid2">' + tiles + '</div></section>';
   }
 
   /* ---------------- 拼音 ---------------- */
@@ -266,6 +326,8 @@
       '<span class="lbl">描一描</span><span class="sub">看笔顺，跟着写</span></button>' +
       '<button class="big" data-act="read"><span class="glyph">读</span>' +
       '<span class="lbl">读一读</span><span class="sub">用学过的字读短句</span></button>' +
+      '<button class="big" data-act="cards"><span class="glyph">卡</span>' +
+      '<span class="lbl">字卡</span><span class="sub">打印出来，剪开就能用</span></button>' +
       '</section>';
   }
 
@@ -334,7 +396,12 @@
   /* ---------------- 阅读 ---------------- */
   function viewRead() {
     var groups = {}, order = [];
-    g.ZREADS.forEach(function (r) {
+    var maxLen = ageCfg().readMax;
+    var pool = g.ZREADS.filter(function (r) {
+      return (r.t.match(/[\u4e00-\u9fa5]/g) || []).length <= maxLen;
+    });
+    if (!pool.length) pool = g.ZREADS.slice();
+    pool.forEach(function (r) {
       if (!groups[r.tag]) { groups[r.tag] = []; order.push(r.tag); }
       groups[r.tag].push(r);
     });
@@ -345,7 +412,9 @@
         }).join('') + '</div></div>';
     }).join('');
     return '<section class="read"><h1>读一读</h1>' +
-      '<p class="lede">每一句都只用你学过的字，可以自己读下来。</p>' + html + '</section>';
+      '<p class="lede">每一句都只用你学过的字，可以自己读下来。' +
+      (maxLen < 99 ? '（当前 ' + ageCfg().label + ' 档，只显示 ' + maxLen + ' 字以内的句子）' : '') +
+      '</p>' + html + '</section>';
   }
 
   function viewReadDetail() {
@@ -398,9 +467,11 @@
           : App.screen === 'blend' ? viewBlend()
             : App.screen === 'more' ? viewMore()
               : App.screen === 'stroke' ? viewStroke()
-                : App.screen === 'read' ? viewRead()
+                : App.screen === 'cards' ? viewCards()
+                  : App.screen === 'map' ? viewMap()
+                  : App.screen === 'read' ? viewRead()
                   : App.screen === 'readd' ? viewReadDetail() : viewParent();
-    var backable = ['m3', 'blend', 'stroke', 'read', 'readd', 'more', 'parent'].indexOf(App.screen) >= 0;
+    var backable = ['m3', 'blend', 'stroke', 'read', 'readd', 'more', 'parent', 'map', 'cards'].indexOf(App.screen) >= 0;
     stage.innerHTML = (backable
       ? '<div class="navrow"><button class="ghost" data-act="back">' +
         (App.screen === 'readd' ? '← 全部句子' : '← 回家') + '</button></div>'
@@ -434,7 +505,14 @@
     App.t0 = Date.now();
     App.qi = 0; App.right = 0; App.tries = 0; App.locked = false; App.log = [];
     if (groupId) App.m3group = groupId;
+    if (mod === 'm1group') App.screen = 'play';
     if (mod === 'm1') App.qs = Gen.lessonM1(SRS.queue(8, 5), !!S.data.settings.pinyin);
+    else if (mod === 'm1group') {
+      var gr = D.groups[+groupId];
+      App.qs = gr
+        ? Gen.lessonM1(gr.chars.map(function (it) { return it.c; }), !!S.data.settings.pinyin)
+        : [];
+    }
     else if (mod === 'm2') App.qs = Gen.lessonM2(8);
     else if (mod === 'm3sym') App.qs = PH.lessonSymbols(App.m3group || 'dan');
     else App.qs = PH.lessonBlend(8);
@@ -462,7 +540,7 @@
     var elapsed = Date.now() - App.t0;
     S.addSeconds(Math.round(elapsed / 1000));
     S.addDone(1);
-    if (App.mod === 'm1') {
+    if (App.mod === 'm1' || App.mod === 'm1group') {
       App.log.forEach(function (r) { SRS.record(r.c, r.ok); });
     } else if (App.mod === 'm3sym' || App.mod === 'm3blend') {
       if (!S.data.m3) S.data.m3 = { right: 0, wrong: 0, plays: 0 };
@@ -521,6 +599,14 @@
         render();
       }
       else if (act === 'go') { start(t.getAttribute('data-mod'), t.getAttribute('data-g')); }
+      else if (t.hasAttribute('data-age')) {
+        var a = t.getAttribute('data-age');
+        S.data.settings.age = a;
+        S.data.settings.pinyin = AGES[a].pinyin;
+        S.save(); render();
+      }
+      else if (act === 'map') { App.screen = 'map'; render(); }
+      else if (act === 'mg') { start('m1group', t.getAttribute('data-g')); }
       else if (act === 'm3') { App.screen = 'm3'; render(); }
       else if (act === 'blend') { App.blend = { ini: null, fin: null }; App.screen = 'blend'; render(); A.preload(['py1', 'py2']); }
       else if (act === 'ini' || act === 'fin') {
@@ -543,6 +629,8 @@
         App.screen = 'stroke'; render();
       }
       else if (act === 'read') { App.screen = 'read'; render(); }
+      else if (act === 'cards') { App.screen = 'cards'; render(); }
+      else if (act === 'print') { window.print(); }
       else if (act === 'r-open') {
         var kk = t.getAttribute('data-k');
         App.read = g.ZREADS.filter(function (x) { return x.k === kk; })[0];

@@ -30,7 +30,9 @@
   var CLASH = {
     '饭': '粥汤米', '粥': '饭汤', '汤': '饭粥', '米': '饭',
     '碗': '盘锅', '盘': '碗锅', '锅': '碗盘',
-    '叶': '草', '草': '叶'
+    '叶': '草', '草': '叶',
+    '树': '松柳林', '松': '树', '柳': '树', '林': '树',
+    '苗': '芽', '芽': '苗'
   };
   function clash(a, b) { var s = CLASH[a]; return !!(s && s.indexOf(b) >= 0); }
 
@@ -237,7 +239,7 @@
   }
 
   function qTone(target) {
-    if ([1, 2, 4].indexOf(target.tone) < 0) {
+    if ([1, 2, 4].indexOf(target.tone) < 0 || !hasSolo(target.c)) {
       var p = near(target, 8, function (it) {
         return (it.tone === 1 || it.tone === 2 || it.tone === 4) && hasSolo(it.c);
       });
