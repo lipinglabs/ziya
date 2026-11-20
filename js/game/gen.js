@@ -3,6 +3,9 @@
    选项优先从相邻主题组取，保证一次闯关只需加载 1-2 个音频包。 */
 (function (g) {
   var BY = {}, LIST = [], RHYME = {}, INI_POOL = [];
+  /* 孤立读音会有歧义的多音字：不生成单字音频，出题一律改走词音频 */
+  var NO_SOLO = { '数': 1 };
+  function hasSolo(c) { return !NO_SOLO[c]; }
 
   function pad(n) { return (n < 10 ? '0' : '') + n; }
   function rnd(n) { return Math.floor(Math.random() * n); }
@@ -50,7 +53,8 @@
   /* ---------- M1 识字 ---------- */
 
   function qListen(target) {
-    var ds = near(target, 3);
+    if (!hasSolo(target.c)) return qWord(target);
+    var ds = near(target, 3, function (it) { return hasSolo(it.c); });
     if (ds.length < 3) return null;
     return {
       mod: 'm1', type: 'listen', target: target.c,
@@ -58,13 +62,13 @@
       audio: akey(target.c, 'c'),
       prompt: { kind: 'speaker' },
       options: shuffle([target].concat(ds)).map(function (it) {
-        return { label: it.c, big: true, ok: it.c === target.c, audio: akey(it.c, 'c') };
+        return { label: it.c, big: true, ok: it.c === target.c, audio: hasSolo(it.c) ? akey(it.c, 'c') : null };
       })
     };
   }
 
   function qWord(target) {
-    var ds = near(target, 3);
+    var ds = near(target, 3, function (it) { return hasSolo(it.c); });
     if (ds.length < 3) return null;
     return {
       mod: 'm1', type: 'word', target: target.c,
@@ -72,7 +76,7 @@
       audio: akey(target.c, 'w'),
       prompt: { kind: 'speaker' },
       options: shuffle([target].concat(ds)).map(function (it) {
-        return { label: it.c, big: true, ok: it.c === target.c, audio: akey(it.c, 'c') };
+        return { label: it.c, big: true, ok: it.c === target.c, audio: hasSolo(it.c) ? akey(it.c, 'c') : null };
       })
     };
   }
@@ -81,10 +85,14 @@
     var correct = target.w[0];
     if (!correct) return null;
     var ds = [];
-    near(target, 12, function (it) {
+    var cands = near(target, 16, function (it) {
       var w = it.w[0];
-      return w && w.indexOf(target.c) < 0 && w !== correct && ds.indexOf(w) < 0;
-    }).forEach(function (it) { if (ds.length < 3) ds.push(it.w[0]); });
+      return w && w.indexOf(target.c) < 0 && w !== correct;
+    });
+    for (var ci = 0; ci < cands.length && ds.length < 3; ci++) {
+      var w0 = cands[ci].w[0];
+      if (ds.indexOf(w0) < 0) ds.push(w0);
+    }
     if (ds.length < 3) return null;
     return {
       mod: 'm1', type: 'match', target: target.c,
@@ -98,7 +106,7 @@
   }
 
   function qRead(target) {
-    var ds = near(target, 3);
+    var ds = near(target, 3, function (it) { return hasSolo(it.c); });
     if (ds.length < 3) return null;
     return {
       mod: 'm1', type: 'read', target: target.c,
@@ -114,10 +122,11 @@
   /* ---------- M2 语音意识 ---------- */
 
   function qRhyme(target) {
-    var same = (RHYME[target.fin] || []).filter(function (c) { return c !== target.c; });
+    if (!hasSolo(target.c)) return null;
+    var same = (RHYME[target.fin] || []).filter(function (c) { return c !== target.c && hasSolo(c); });
     if (!same.length) return null;
     var correctChar = pick(same);
-    var ds = near(target, 2, function (it) { return it.fin !== target.fin; });
+    var ds = near(target, 2, function (it) { return it.fin !== target.fin && hasSolo(it.c); });
     if (ds.length < 2) return null;
     var opts = shuffle([BY[correctChar]].concat(ds));
     return {
@@ -155,7 +164,15 @@
   function qSyllable(target) {
     var n = 1 + rnd(3);
     var it = target, word;
-    if (n === 1) { word = target.c; }
+    if (n === 1) {
+      if (!hasSolo(target.c)) {
+        var p1 = near(target, 20, function (x) { return hasSolo(x.c); });
+        if (!p1.length) return null;
+        target = p1[0];
+      }
+      word = target.c;
+      it = target;
+    }
     else {
       var pool = near(target, 20, function (x) { return x.w[0] && x.w[0].length === n; });
       if (!pool.length) return null;
@@ -182,9 +199,9 @@
       audio: akey(target.c, 'c'),
       prompt: { kind: 'char', text: target.c, sub: '听声音' },
       options: shuffle([
-        { t: '平', d: 'flat', ok: target.tone === 1 },
-        { t: '升', d: 'up', ok: target.tone === 2 },
-        { t: '降', d: 'down', ok: target.tone === 4 }
+        { t: '平', label: '平', d: 'flat', ok: target.tone === 1 },
+        { t: '升', label: '升', d: 'up', ok: target.tone === 2 },
+        { t: '降', label: '降', d: 'down', ok: target.tone === 4 }
       ])
     };
   }
