@@ -10,6 +10,18 @@
     '6': { label: '6 岁', pinyin: true, readMax: 99, note: '全部解锁' }
   };
   function ageCfg() { return AGES[S.data.settings.age] || AGES['4']; }
+
+  /* 题型阶段：跟着「已学字数」走，不跟年龄走 —— 学得快就早点上难题型。
+     阶段 1 只看图（不认识字也能答），2 加听音，3 才上需要识字的题型。 */
+  function typePhase() {
+    var n = SRS.stats().started;
+    return n < 24 ? 1 : (n < 80 ? 2 : 3);
+  }
+  function phaseName(n) {
+    return n === 1 ? '看图为主（形↔义）'
+      : n === 2 ? '看图 + 听音'
+        : '全部题型（含字→词、字→读音）';
+  }
   var PH = g.ZYPhonics, PY = g.ZPY;
   var TIME_LIMIT = 12 * 60 * 1000;
   var stage = null;
@@ -84,8 +96,15 @@
         '<div class="psub">看图，选一个字</div></div>';
     }
     if (p.kind === 'char') {
+      var q0 = cur();
+      /* 题干只有汉字时，孩子听不清就没法答，必须给一个重播键 */
+      var rep = (q0 && (q0.audio || q0.seq))
+        ? '<button class="replay" data-act="replay">' +
+          '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/>' +
+          '<path d="M16.5 8.5a5 5 0 0 1 0 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>' +
+          '</svg>再听一遍</button>' : '';
       return '<div class="prompt"><div class="bigchar">' + p.text + '</div>' +
-        (p.sub ? '<div class="psub">' + p.sub + '</div>' : '') + '</div>';
+        (p.sub ? '<div class="psub">' + p.sub + '</div>' : '') + rep + '</div>';
     }
     if (p.kind === 'speaker2') {
       return '<div class="prompt"><div class="two-spk">' +
@@ -186,7 +205,8 @@
       '<h1>家长面板</h1>' +
       '<div class="card"><h3>掌握度分布</h3>' + bars +
       '<p class="tiny">已开始 ' + st.started + ' 字 · 掌握（5 级）' + (dist[5] || 0) + ' 字 · ' +
-      '仍在提示期 ' + SRS.hintCount() + ' 字（第 11 次出现后自动撤掉）</p></div>' +
+      '仍在提示期 ' + SRS.hintCount() + ' 字（第 11 次出现后自动撤掉）</p>' +
+      '<p class="tiny">当前题型阶段：' + phaseName(typePhase()) + '</p></div>' +
       '<div class="card"><h3>错字榜</h3><div class="chips">' + mis + '</div></div>' +
       '<div class="card"><h3>近 7 天（分钟）</h3><div class="chart">' + chart + '</div></div>' +
       '<div class="card"><h3>设置</h3>' +
@@ -521,24 +541,24 @@
     }, HINT_AFTER);
   }
 
-  function autoSpeak() {
+  function voiceQuestion() {
     var qq = cur();
     if (!qq) return;
     if (qq.seq) {
-      setTimeout(function () {
-        A.sequence(qq.seq, 1500, function (k, i) {
-          var os = stage.querySelectorAll('.opt');
-          for (var j = 0; j < os.length; j++) os[j].classList.remove('speaking');
-          if (i >= 1 && os[i - 1]) os[i - 1].classList.add('speaking');
-        }, function () {
-          var os = stage.querySelectorAll('.opt');
-          for (var j = 0; j < os.length; j++) os[j].classList.remove('speaking');
-        });
-      }, 300);
+      A.sequence(qq.seq, 1500, function (k, i) {
+        var os = stage.querySelectorAll('.opt');
+        for (var j = 0; j < os.length; j++) os[j].classList.remove('speaking');
+        if (i >= 1 && os[i - 1]) os[i - 1].classList.add('speaking');
+      }, function () {
+        var os = stage.querySelectorAll('.opt');
+        for (var j = 0; j < os.length; j++) os[j].classList.remove('speaking');
+      });
     } else if (qq.audio) {
-      setTimeout(function () { A.play(qq.audio); }, 320);
+      A.play(qq.audio);
     }
   }
+
+  function autoSpeak() { setTimeout(voiceQuestion, 320); }
 
   /* ---------------- 流程 ---------------- */
   function start(mod, groupId) {
@@ -547,11 +567,13 @@
     App.qi = 0; App.right = 0; App.tries = 0; App.locked = false; App.log = [];
     if (groupId) App.m3group = groupId;
     if (mod === 'm1group') App.screen = 'play';
-    if (mod === 'm1') App.qs = Gen.lessonM1(SRS.queue(8, 5), !!S.data.settings.pinyin);
+    if (mod === 'm1') {
+      App.qs = Gen.lessonM1(SRS.queue(8, 5), !!S.data.settings.pinyin, typePhase());
+    }
     else if (mod === 'm1group') {
       var gr = D.groups[+groupId];
       App.qs = gr
-        ? Gen.lessonM1(gr.chars.map(function (it) { return it.c; }), !!S.data.settings.pinyin)
+        ? Gen.lessonM1(gr.chars.map(function (it) { return it.c; }), !!S.data.settings.pinyin, typePhase())
         : [];
     }
     else if (mod === 'm2') App.qs = Gen.lessonM2(8);
@@ -714,6 +736,7 @@
       else if (act === 'st-next' && App.stroke.i < App.stroke.list.length - 1) { App.stroke.i++; render(); }
       else if (act === 'opt') { choose(+t.getAttribute('data-i')); }
       else if (act === 'play') { A.play(t.getAttribute('data-key')); }
+      else if (act === 'replay') { voiceQuestion(); }
       else if (act === 'home') {
         App.screen = (App.mod === 'm3sym' || App.mod === 'm3blend') ? 'm3' : 'home';
         render();

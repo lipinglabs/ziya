@@ -261,10 +261,21 @@
 
   /* ---------- 出题 ---------- */
 
-  function lessonM1(chars, withPinyin) {
-    var types = withPinyin
+  /* 题型按阶段推进，不搞「一上来六种题型混着来」：
+     阶段 1 只看图（形↔义，不需要认字也不需要听辨）
+     阶段 2 加听音（音→字）与听词（词→字）
+     阶段 3 才上「字→词」「字→读音」这些真正需要识字的题型
+     无图的字会自然回落到听音题（qPic 返回 null，由外层 fallback 处理）。 */
+  function typeList(phase, withPinyin) {
+    if (phase <= 1) return ['pic', 'picmatch', 'pic', 'picmatch', 'listen', 'pic', 'picmatch', 'listen'];
+    if (phase <= 2) return ['pic', 'listen', 'picmatch', 'word', 'pic', 'listen', 'picmatch', 'word'];
+    return withPinyin
       ? ['pic', 'word', 'picmatch', 'match', 'listen', 'pic', 'read', 'listen']
       : ['pic', 'word', 'picmatch', 'match', 'listen', 'pic', 'match', 'word'];
+  }
+
+  function lessonM1(chars, withPinyin, phase) {
+    var types = typeList(phase || 3, withPinyin);
     var qs = [];
     chars.forEach(function (ch, i) {
       var it = BY[ch];
@@ -307,6 +318,7 @@
   g.ZYGen = {
     init: init, akey: akey, packOf: packOf, packsOf: packsOf,
     byChar: function (c) { return BY[c]; },
+    typeList: typeList,
     hasImg: hasImg, imgKey: imgKey,
     lessonM1: lessonM1, lessonM2: lessonM2
   };

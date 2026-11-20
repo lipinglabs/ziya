@@ -451,3 +451,18 @@ body[data-sandbox="1"] .sandboxbar { display: block; }
 @media (prefers-reduced-motion: reduce) {
   .opt.hint { animation: none; box-shadow: 0 0 0 4px rgba(224, 138, 60, .7); }
 }
+
+/* ---------- 重播键 ---------- */
+.replay {
+  margin-top: 10px; display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 16px; border-radius: 999px;
+  background: var(--card); border: 1px solid var(--line);
+  color: var(--ink); font-size: 14px;
+}
+.replay:active { transform: scale(.97); }
+.replay svg { width: 16px; height: 16px; fill: currentColor; opacity: .62; flex: 0 0 auto; }
+
+
+/* 图片选项限宽：平板上不放大到撑破一屏 */
+.opts.pics { max-width: 420px; width: 100%; margin: 0 auto; }
+body[data-screen="play"] #stage { max-width: 560px; }

@@ -70,7 +70,13 @@
       var pick = due.slice(0, need);
       var cap = Math.max(0, Math.min(newCap === undefined ? 5 : newCap, need - pick.length));
       pick = pick.concat(fresh.slice(0, cap).map(function (i) { return i.c; }));
-      /* 不够就用已掌握但未到期的补，保证一关题目数固定 */
+      /* 还不够就继续从「新字表」里补 —— 新字表是「有图优先」排过序的，
+         这样补进来的字也有图，不会突然冒出三个没图的抽象字。 */
+      if (pick.length < need) {
+        var more = fresh.filter(function (i) { return pick.indexOf(i.c) < 0; });
+        pick = pick.concat(more.slice(0, need - pick.length).map(function (i) { return i.c; }));
+      }
+      /* 仍然不够就用已掌握但未到期的补，保证一关题目数固定 */
       if (pick.length < need) {
         var extra = g.ZIYA_DATA.items.filter(function (i) {
           var r = g.ZStore.data.chars[i.c];

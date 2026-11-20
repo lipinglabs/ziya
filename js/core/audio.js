@@ -73,10 +73,13 @@
         : (A.dur[k] || 1.6);
       setTimeout(fin, sec * 1000 + 420);   /* 兜底：ended 不触发也不会卡住 */
     },
-    /* 顺序播放一串音频，用于「先听题、再听三个选项」 */
+    _seq: 0,
+    /* 顺序播放一串音频，用于「先听题、再听三个选项」。
+       重复点重播时会起一条新序列，旧的靠 _seq 令牌自动作废，不会两条并行。 */
     sequence: function (keys, gap, onEach, onDone) {
-      var i = 0;
+      var id = ++A._seq, i = 0;
       function step() {
+        if (id !== A._seq) return;
         if (i >= keys.length) { if (onDone) onDone(); return; }
         var k = keys[i++];
         if (onEach) onEach(k, i - 1);
@@ -84,7 +87,8 @@
         setTimeout(step, gap);
       }
       step();
-    }
+    },
+    stopSequence: function () { A._seq++; }
   };
   g.ZYAudio = A;
 })(window);
