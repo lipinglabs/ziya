@@ -1,5 +1,5 @@
 /* 字芽 Service Worker：应用外壳预缓存 + 运行时缓存，首次打开后完全离线可玩。 */
-const VERSION = 'ziya-v10';
+const VERSION = 'ziya-v11';
 const CORE = [
   './',
   'index.html',
@@ -20,7 +20,7 @@ const CORE = [
   'js/app.js',
   'audio/ui.js',
   'audio/g01.js',
-  'icon.svg',
+  'icon-180.png',
   'icon-192.png',
   'icon-512.png'
 ];
