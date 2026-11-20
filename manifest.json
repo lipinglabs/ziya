@@ -1,0 +1,17 @@
+{
+  "name": "字芽 · 识字启蒙",
+  "short_name": "字芽",
+  "description": "幼儿识字与语音意识启蒙，4 岁起可用，离线可玩。",
+  "lang": "zh-CN",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FBF6EC",
+  "theme_color": "#FBF6EC",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

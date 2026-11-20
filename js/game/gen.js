@@ -1,0 +1,239 @@
+/* 题目生成器：全部从 300 字表 + 拼音推导，不预写题库。
+   改动一个字表读音，全部题目自动跟着改，也不会出现「背题库」。
+   选项优先从相邻主题组取，保证一次闯关只需加载 1-2 个音频包。 */
+(function (g) {
+  var BY = {}, LIST = [], RHYME = {}, INI_POOL = [];
+
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function rnd(n) { return Math.floor(Math.random() * n); }
+  function pick(a) { return a[rnd(a.length)]; }
+  function shuffle(a) {
+    a = a.slice();
+    for (var i = a.length - 1; i > 0; i--) { var j = rnd(i + 1); var t = a[i]; a[i] = a[j]; a[j] = t; }
+    return a;
+  }
+
+  function akey(ch, kind) {
+    var it = BY[ch];
+    if (!it) return null;
+    return (kind === 'w' ? 'w' : 'c') + pad(Math.floor(it.i / 10) + 1) + pad(it.i % 10 + 1);
+  }
+  function packOf(ch) {
+    var it = BY[ch];
+    return it ? 'g' + pad(Math.floor(it.i / 10) + 1) : 'ui';
+  }
+  function packOfKey(k) { return k && k.length >= 3 && 'cw'.indexOf(k[0]) >= 0 ? 'g' + k.substr(1, 2) : 'ui'; }
+
+  /* 就近取样：先在同组，再向两侧扩，控制音频包数量 */
+  function near(target, n, pred) {
+    var p = LIST.filter(function (it) {
+      return it.c !== target.c && (!pred || pred(it));
+    });
+    p.sort(function (a, b) { return Math.abs(a.i - target.i) - Math.abs(b.i - target.i); });
+    var head = p.slice(0, Math.max(n * 2, 16));
+    return shuffle(head).slice(0, n);
+  }
+
+  function init() {
+    LIST = g.ZIYA_DATA.items;
+    LIST.forEach(function (it, i) {
+      it.i = i;
+      BY[it.c] = it;
+      var p = g.ZPinyin.parse(it.p);
+      it.ini = p.ini; it.fin = p.fin; it.tone = p.tone;
+      var r = g.ZPinyin.rhyme(it.p);
+      (RHYME[r] = RHYME[r] || []).push(it.c);
+      if (p.ini) INI_POOL.push(it.c);
+    });
+  }
+
+  /* ---------- M1 识字 ---------- */
+
+  function qListen(target) {
+    var ds = near(target, 3);
+    if (ds.length < 3) return null;
+    return {
+      mod: 'm1', type: 'listen', target: target.c,
+      q: '听一听，是哪个字？',
+      audio: akey(target.c, 'c'),
+      prompt: { kind: 'speaker' },
+      options: shuffle([target].concat(ds)).map(function (it) {
+        return { label: it.c, big: true, ok: it.c === target.c, audio: akey(it.c, 'c') };
+      })
+    };
+  }
+
+  function qWord(target) {
+    var ds = near(target, 3);
+    if (ds.length < 3) return null;
+    return {
+      mod: 'm1', type: 'word', target: target.c,
+      q: '哪一个字藏在这个词里？',
+      audio: akey(target.c, 'w'),
+      prompt: { kind: 'speaker' },
+      options: shuffle([target].concat(ds)).map(function (it) {
+        return { label: it.c, big: true, ok: it.c === target.c, audio: akey(it.c, 'c') };
+      })
+    };
+  }
+
+  function qMatch(target) {
+    var correct = target.w[0];
+    if (!correct) return null;
+    var ds = [];
+    near(target, 12, function (it) {
+      var w = it.w[0];
+      return w && w.indexOf(target.c) < 0 && w !== correct && ds.indexOf(w) < 0;
+    }).forEach(function (it) { if (ds.length < 3) ds.push(it.w[0]); });
+    if (ds.length < 3) return null;
+    return {
+      mod: 'm1', type: 'match', target: target.c,
+      q: '这个字，藏在哪个词里？',
+      audio: akey(target.c, 'w'),
+      prompt: { kind: 'char', text: target.c },
+      options: shuffle([correct].concat(ds)).map(function (w) {
+        return { label: w, ok: w === correct, audio: w === correct ? akey(target.c, 'w') : null };
+      })
+    };
+  }
+
+  function qRead(target) {
+    var ds = near(target, 3);
+    if (ds.length < 3) return null;
+    return {
+      mod: 'm1', type: 'read', target: target.c,
+      q: '这个字怎么读？',
+      audio: akey(target.c, 'c'),
+      prompt: { kind: 'char', text: target.c },
+      options: shuffle([target].concat(ds)).map(function (it) {
+        return { label: it.p, ok: it.c === target.c, audio: akey(it.c, 'c') };
+      })
+    };
+  }
+
+  /* ---------- M2 语音意识 ---------- */
+
+  function qRhyme(target) {
+    var same = (RHYME[target.fin] || []).filter(function (c) { return c !== target.c; });
+    if (!same.length) return null;
+    var correctChar = pick(same);
+    var ds = near(target, 2, function (it) { return it.fin !== target.fin; });
+    if (ds.length < 2) return null;
+    var opts = shuffle([BY[correctChar]].concat(ds));
+    return {
+      mod: 'm2', type: 'rhyme', target: target.c,
+      q: '哪两个字的尾巴一样？',
+      audio: akey(target.c, 'c'),
+      prompt: { kind: 'char', text: target.c },
+      seq: [akey(target.c, 'c')].concat(opts.map(function (it) { return akey(it.c, 'c'); })),
+      options: opts.map(function (it) {
+        return { label: it.c, big: true, ok: it.c === correctChar, audio: akey(it.c, 'c') };
+      })
+    };
+  }
+
+  function qOnset(target) {
+    var pool = near(target, 10, function (it) { return it.ini && it.ini !== target.ini; });
+    var sameIni = near(target, 4, function (it) { return it.ini === target.ini; });
+    var useSame = sameIni.length && (!pool.length || Math.random() < 0.5);
+    var other = useSame ? sameIni[0] : pool[0];
+    if (!other) return null;
+    var answer = other.ini === target.ini;
+    return {
+      mod: 'm2', type: 'onset', target: target.c,
+      q: '这两个词，开头的声音一样吗？',
+      audio: akey(target.c, 'w'),
+      prompt: { kind: 'speaker2', a: akey(target.c, 'w'), b: akey(other.c, 'w') },
+      seq: [akey(target.c, 'w'), akey(other.c, 'w')],
+      options: shuffle([
+        { label: '一样', ok: answer === true },
+        { label: '不一样', ok: answer === false }
+      ])
+    };
+  }
+
+  function qSyllable(target) {
+    var n = 1 + rnd(3);
+    var it = target, word;
+    if (n === 1) { word = target.c; }
+    else {
+      var pool = near(target, 20, function (x) { return x.w[0] && x.w[0].length === n; });
+      if (!pool.length) return null;
+      it = pool[0]; word = it.w[0];
+    }
+    return {
+      mod: 'm2', type: 'syllable', target: it.c,
+      q: '数一数，有几个音节？',
+      audio: n === 1 ? akey(it.c, 'c') : akey(it.c, 'w'),
+      prompt: { kind: 'speaker' },
+      options: shuffle([1, 2, 3].map(function (v) { return { label: v + ' 下', dots: v, ok: v === n }; }))
+    };
+  }
+
+  function qTone(target) {
+    if ([1, 2, 4].indexOf(target.tone) < 0) {
+      var p = near(target, 8, function (it) { return it.tone === 1 || it.tone === 2 || it.tone === 4; });
+      if (!p.length) return null;
+      target = p[0];
+    }
+    return {
+      mod: 'm2', type: 'tone', target: target.c,
+      q: '这个声音是平的、往上、还是往下？',
+      audio: akey(target.c, 'c'),
+      prompt: { kind: 'char', text: target.c, sub: '听声音' },
+      options: shuffle([
+        { t: '平', d: 'flat', ok: target.tone === 1 },
+        { t: '升', d: 'up', ok: target.tone === 2 },
+        { t: '降', d: 'down', ok: target.tone === 4 }
+      ])
+    };
+  }
+
+  /* ---------- 出题 ---------- */
+
+  function lessonM1(chars, withPinyin) {
+    var types = withPinyin
+      ? ['listen', 'word', 'match', 'listen', 'word', 'match', 'read', 'listen']
+      : ['listen', 'word', 'match', 'listen', 'word', 'match', 'listen', 'word'];
+    var qs = [];
+    chars.forEach(function (ch, i) {
+      var it = BY[ch];
+      if (!it) return;
+      var order = types.slice(i % types.length).concat(types);
+      for (var k = 0; k < order.length; k++) {
+        var t = order[k], o = null;
+        if (t === 'listen') o = qListen(it);
+        else if (t === 'word') o = qWord(it);
+        else if (t === 'match') o = qMatch(it);
+        else o = qRead(it);
+        if (o) { qs.push(o); break; }
+      }
+    });
+    return qs;
+  }
+
+  function lessonM2(n) {
+    var qs = [], gens = [qRhyme, qOnset, qSyllable, qTone], guard = 0;
+    while (qs.length < (n || 8) && guard++ < 300) {
+      var o = pick(gens)(pick(LIST));
+      if (o) qs.push(o);
+    }
+    return qs;
+  }
+
+  /* 一节课涉及的全部音频包 */
+  function packsOf(qs) {
+    var s = { ui: 1 };
+    qs.forEach(function (o) {
+      (o.seq || []).forEach(function (k) { s[packOfKey(k)] = 1; });
+      if (o.audio) s[packOfKey(o.audio)] = 1;
+      o.options.forEach(function (op) { if (op.audio) s[packOfKey(op.audio)] = 1; });
+    });
+    return Object.keys(s);
+  }
+
+  g.ZYGen = {
+    init: init, akey: akey, packOf: packOf, packsOf: packsOf,
+    lessonM1: lessonM1, lessonM2: lessonM2
+  };
+})(window);
