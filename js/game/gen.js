@@ -4,7 +4,7 @@
 (function (g) {
   var BY = {}, LIST = [], RHYME = {}, INI_POOL = [];
   /* 孤立读音会有歧义的多音字：不生成单字音频，出题一律改走词音频 */
-  var NO_SOLO = { '数': 1 };
+  var NO_SOLO = { '数': 1, '只': 1 };
   function hasSolo(c) { return !NO_SOLO[c]; }
 
   function pad(n) { return (n < 10 ? '0' : '') + n; }
@@ -25,6 +25,18 @@
     var it = BY[ch];
     return it ? 'g' + pad(Math.floor(it.i / 10) + 1) : 'ui';
   }
+  /* 同框会互相干扰的图：一碗饭/一碗粥/一碗汤、几个圆器皿、两片叶子/一丛草。
+     它们不能同时作为一道题的选项，否则考的是「猜」而不是「认」。 */
+  var CLASH = {
+    '饭': '粥汤米', '粥': '饭汤', '汤': '饭粥', '米': '饭',
+    '碗': '盘锅', '盘': '碗锅', '锅': '碗盘',
+    '叶': '草', '草': '叶'
+  };
+  function clash(a, b) { var s = CLASH[a]; return !!(s && s.indexOf(b) >= 0); }
+
+  function hasImg(c) { return !!(g.ZY_IMG && BY[c] && g.ZY_IMG[akey(c, 'c')]); }
+  function imgKey(c) { return akey(c, 'c') + '.webp'; }
+
   function packOfKey(k) { return k && k.length >= 3 && 'cw'.indexOf(k[0]) >= 0 ? 'g' + k.substr(1, 2) : 'ui'; }
 
   /* 就近取样：先在同组，再向两侧扩，控制音频包数量 */
@@ -105,13 +117,50 @@
     };
   }
 
+  /* 看图选字：图片是皮，考的是「音—义—形」三者对应 */
+  function qPic(target) {
+    if (!hasImg(target.c)) return null;
+    var ds = near(target, 3, function (it) { return hasImg(it.c) && !clash(target.c, it.c); });
+    if (ds.length < 3) return null;
+    return {
+      mod: 'm1', type: 'pic', target: target.c,
+      q: '这是什么？',
+      audio: null,
+      prompt: { kind: 'img', src: imgKey(target.c) },
+      options: shuffle([target].concat(ds)).map(function (it) {
+        return { label: it.c, big: true, ok: it.c === target.c, audio: hasSolo(it.c) ? akey(it.c, 'c') : null };
+      })
+    };
+  }
+
+  /* 看字选图：反过来，考「形→义」 */
+  function qPicMatch(target) {
+    if (!hasImg(target.c)) return null;
+    var ds = near(target, 3, function (it) { return hasImg(it.c) && !clash(target.c, it.c); });
+    if (ds.length < 3) return null;
+    return {
+      mod: 'm1', type: 'picmatch', target: target.c,
+      q: '哪个是「' + target.c + '」？',
+      audio: akey(target.c, 'c'),
+      prompt: { kind: 'char', text: target.c },
+      options: shuffle([target].concat(ds)).map(function (it) {
+        return { img: imgKey(it.c), label: it.c, ok: it.c === target.c, audio: null };
+      })
+    };
+  }
+
   function qRead(target) {
-    var ds = near(target, 3, function (it) { return hasSolo(it.c); });
+    /* 他/她 同音，读音题里不能让两个 tā 同时当选项，否则答案不唯一 */
+    var cand = near(target, 14, function (it) { return hasSolo(it.c) && it.p !== target.p; });
+    var ds = [], used = {};
+    cand.forEach(function (it) {
+      if (ds.length < 3 && !used[it.p]) { used[it.p] = 1; ds.push(it); }
+    });
     if (ds.length < 3) return null;
     return {
       mod: 'm1', type: 'read', target: target.c,
       q: '这个字怎么读？',
-      audio: akey(target.c, 'c'),
+      audio: hasSolo(target.c) ? akey(target.c, 'c') : null,
       prompt: { kind: 'char', text: target.c },
       options: shuffle([target].concat(ds)).map(function (it) {
         return { label: it.p, ok: it.c === target.c, audio: hasSolo(it.c) ? akey(it.c, 'c') : null };
@@ -212,8 +261,8 @@
 
   function lessonM1(chars, withPinyin) {
     var types = withPinyin
-      ? ['listen', 'word', 'match', 'listen', 'word', 'match', 'read', 'listen']
-      : ['listen', 'word', 'match', 'listen', 'word', 'match', 'listen', 'word'];
+      ? ['pic', 'word', 'picmatch', 'match', 'listen', 'pic', 'read', 'listen']
+      : ['pic', 'word', 'picmatch', 'match', 'listen', 'pic', 'match', 'word'];
     var qs = [];
     chars.forEach(function (ch, i) {
       var it = BY[ch];
@@ -224,6 +273,8 @@
         if (t === 'listen') o = qListen(it);
         else if (t === 'word') o = qWord(it);
         else if (t === 'match') o = qMatch(it);
+        else if (t === 'pic') o = qPic(it);
+        else if (t === 'picmatch') o = qPicMatch(it);
         else o = qRead(it);
         if (o) { qs.push(o); break; }
       }
@@ -254,6 +305,7 @@
   g.ZYGen = {
     init: init, akey: akey, packOf: packOf, packsOf: packsOf,
     byChar: function (c) { return BY[c]; },
+    hasImg: hasImg, imgKey: imgKey,
     lessonM1: lessonM1, lessonM2: lessonM2
   };
 })(window);

@@ -33,10 +33,19 @@
       return out;
     },
     newList: function () {
-      return g.ZIYA_DATA.items.filter(function (it) {
+      var arr = g.ZIYA_DATA.items.filter(function (it) {
         var r = g.ZStore.data.chars[it.c];
         return !r || r.lvl === 0;
       });
+      /* 先学有插图的字：具体名词先于抽象字，4 岁更容易建立「字—物」对应 */
+      var hasImg = g.ZYGen && g.ZYGen.hasImg;
+      if (hasImg) {
+        arr = arr.slice().sort(function (a, b) {
+          var d = (hasImg(a.c) ? 0 : 1) - (hasImg(b.c) ? 0 : 1);
+          return d !== 0 ? d : a.i - b.i;
+        });
+      }
+      return arr;
     },
     /* 今日建议队列：先复习到期，再补新字到 need 个 */
     queue: function (need, newCap) {

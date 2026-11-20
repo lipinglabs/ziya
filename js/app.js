@@ -69,6 +69,10 @@
         '<div class="gap-py">' + L + R + '</div>' +
         '<div class="psub">听一听，再选</div></div>';
     }
+    if (p.kind === 'img') {
+      return '<div class="prompt"><img class="promptimg" src="img/' + p.src + '" alt="">' +
+        '<div class="psub">看图，选一个字</div></div>';
+    }
     if (p.kind === 'char') {
       return '<div class="prompt"><div class="bigchar">' + p.text + '</div>' +
         (p.sub ? '<div class="psub">' + p.sub + '</div>' : '') + '</div>';
@@ -85,10 +89,12 @@
 
   function viewOptions(qq) {
     var n = qq.options.length;
-    var cls = 'opts n' + n + (qq.type === 'match' || qq.type === 'read' ? ' text' : '');
+    var cls = 'opts n' + n + (qq.type === 'match' || qq.type === 'read' ? ' text' : '') +
+      (qq.type === 'picmatch' ? ' pics' : '');
     var body = qq.options.map(function (o, i) {
       var inner;
-      if (o.py) inner = '<span class="opt-py">' + o.label + '</span>';
+      if (o.img) inner = '<img class="optimg" src="img/' + o.img + '" alt="">';
+      else if (o.py) inner = '<span class="opt-py">' + o.label + '</span>';
       else if (o.big) inner = '<span class="opt-char">' + o.label + '</span>';
       else if (o.dots) inner = '<span class="opt-dots">' + dots(o.dots) + '</span>';
       else if (o.d) inner = toneSVG(o.d) + '<span class="opt-word">' + o.t + '</span>';
@@ -111,9 +117,8 @@
   function viewPlay() {
     var qq = cur();
     if (!qq) return viewDone();
-    var prog = '';
-    for (var i = 0; i < App.qs.length; i++) prog += '<b class="' + (i < App.qi ? 'done' : i === App.qi ? 'now' : '') + '"></b>';
-    return '<section class="play"><div class="dots">' + prog + '</div>' +
+    var pct = Math.round(App.qi / App.qs.length * 100);
+    return '<section class="play"><div class="pbar"><i style="width:' + pct + '%"></i></div>' +
       '<h2 class="qq">' + qq.q + '</h2>' +
       viewPrompt(qq.prompt) + viewOptions(qq) +
       '<div class="hint" id="hint"></div></section>';
@@ -280,13 +285,13 @@
 
   function viewStroke() {
     var st = App.stroke, ch = st.list[st.i], it = Gen.byChar(ch);
-    var prog = '';
-    for (var i = 0; i < st.list.length; i++) prog += '<b class="' + (i === st.i ? 'now' : i < st.i ? 'done' : '') + '"></b>';
+    var pct = Math.round((st.i + 1) / st.list.length * 100);
     return '<section class="stroke">' +
-      '<div class="dots">' + prog + '</div>' +
+      '<div class="pbar"><i style="width:' + pct + '%"></i></div>' +
       '<div class="sphead"><span class="sppy">' + (it ? it.p : '') +
       (it ? ' · ' + it.w[0] : '') + '</span></div>' +
       '<div class="hw" id="hw"></div>' +
+      '<div class="spresult"></div>' +
       '<div class="spbtns">' +
       '<button class="ghost" data-act="st-play">再看一遍</button>' +
       '<button class="ghost primary-ghost" data-act="st-trace">描一描</button>' +
@@ -553,8 +558,19 @@
       else if (act === 'st-play') { if (App.writer) App.writer.animateCharacter(); }
       else if (act === 'st-trace') {
         if (!App.writer) return;
+        var res = stage.querySelector('.spresult');
+        if (res) { res.classList.remove('show'); res.textContent = ''; }
         App.writer.quiz({
-          onComplete: function () { A.play('u02'); setTimeout(function () { if (App.writer) App.writer.animateCharacter(); }, 500); }
+          onMistake: function () { App.writer.__m = (App.writer.__m || 0) + 1; },
+          onComplete: function (sum) {
+            var m = (sum && sum.totalMistakes) || App.writer.__m || 0;
+            if (res) {
+              res.textContent = m === 0 ? '一笔都没错，真棒！' : '写完了，错了 ' + m + ' 笔，再来一次？';
+              res.classList.add('show');
+            }
+            A.play(m === 0 ? 'u01' : 'u02');
+            setTimeout(function () { if (App.writer) App.writer.animateCharacter(); }, 1400);
+          }
         });
       }
       else if (act === 'st-prev' && App.stroke.i > 0) { App.stroke.i--; render(); }

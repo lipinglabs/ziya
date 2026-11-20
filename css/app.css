@@ -98,8 +98,12 @@ button {
 
 /* ---------- 答题 ---------- */
 .play { display: flex; flex-direction: column; gap: 18px; }
-.dots { display: flex; gap: 6px; justify-content: center; }
-.dots b { width: 22px; height: 5px; border-radius: 3px; background: var(--line); }
+.dots { display: flex; gap: 6px; justify-content: center; align-items: center; }
+.dots b {
+  display: block; flex: 0 0 auto;
+  width: 22px; height: 5px; min-height: 5px; max-height: 5px;
+  border-radius: 3px; background: var(--line);
+}
 .dots b.done { background: var(--teal); }
 .dots b.now { background: var(--amber); }
 
@@ -352,3 +356,23 @@ input:checked + .sw::after { transform: translateX(20px); }
 .sphead .sppy { font-size: 14px; color: var(--muted); letter-spacing: .5px; }
 
 .navrow { display: flex; margin-bottom: 10px; }
+
+/* ---------- 插图题型 ---------- */
+.promptimg {
+  width: 236px; height: 236px; object-fit: cover;
+  border-radius: 24px; display: block;
+}
+.opts.pics .opt { padding: 0; overflow: hidden; min-height: 120px; }
+.optimg { width: 100%; height: 100%; object-fit: cover; display: block; }
+.opts.pics .opt.ok { box-shadow: inset 0 0 0 4px var(--teal); }
+.opts.pics .opt.bad { box-shadow: inset 0 0 0 4px var(--red); }
+.opts.pics .opt { aspect-ratio: 1 / 1; height: auto; }
+
+/* 进度条：替代圆点，避免 flex 拉伸问题 */
+.pbar { height: 6px; border-radius: 3px; background: #EFE7DA; overflow: hidden; }
+.pbar i { display: block; height: 100%; background: var(--teal); border-radius: 3px; transition: width .3s ease; }
+.spresult {
+  min-height: 20px; font-size: 14px; color: var(--teal);
+  opacity: 0; transition: opacity .25s ease;
+}
+.spresult.show { opacity: 1; }
