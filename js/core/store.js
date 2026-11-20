@@ -13,6 +13,7 @@
       created: Date.now(),
       chars: {},
       days: {},
+      appear: {},
       settings: { pinyin: false, muted: false, age: '4' },
       m2: { right: 0, wrong: 0, plays: 0 }
     };
@@ -35,6 +36,7 @@
       if (!S.data.settings.age) S.data.settings.age = '4';
       if (!S.data.days) S.data.days = {};
       if (!S.data.chars) S.data.chars = {};
+      if (!S.data.appear) S.data.appear = {};
       return S.data;
     },
     save: function () {

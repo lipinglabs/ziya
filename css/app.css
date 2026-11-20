@@ -434,3 +434,20 @@ input:checked + .sw::after { transform: translateX(20px); }
 }
 body[data-sandbox="1"] #stage { padding-top: 62px; }
 body[data-sandbox="1"] .sandboxbar { display: block; }
+
+/* ---------- 新手提示：进入题目 3 秒后，给正确项一个柔和的圈 ---------- */
+.opt.hint {
+  animation: hintPulse 1.7s ease-in-out infinite;
+  position: relative;
+}
+@keyframes hintPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 3px rgba(224, 138, 60, .45), 0 6px 18px rgba(224, 138, 60, .16);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(224, 138, 60, .78), 0 8px 26px rgba(224, 138, 60, .30);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .opt.hint { animation: none; box-shadow: 0 0 0 4px rgba(224, 138, 60, .7); }
+}

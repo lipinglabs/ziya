@@ -51,6 +51,7 @@ audio/ui.js            20 条界面语音
 strokes/gNN.js         每 10 字一个笔顺包
 tools/                 生产与发布工具（不入库）
 sw.js                  离线缓存（改版必须改 VERSION）
+icon-*.png             应用图标（180/192/512/32/16 + maskable 512）
 ```
 
 ## 铁律（继承自 lilearn-english）

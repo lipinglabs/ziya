@@ -25,6 +25,22 @@
       r.due = Date.now() + INTERVAL[r.lvl] * DAY;
       return r;
     },
+    /* 出现计数：只记「这个字被显示给孩子的次数」，与掌握度无关。
+       前 10 次出现要给提示，第 11 次起撤掉。 */
+    touch: function (ch) {
+      var a = g.ZStore.data.appear || (g.ZStore.data.appear = {});
+      a[ch] = (a[ch] || 0) + 1;
+      return a[ch];
+    },
+    appears: function (ch) {
+      var a = g.ZStore.data.appear;
+      return a ? (a[ch] || 0) : 0;
+    },
+    hintCount: function () {
+      var a = g.ZStore.data.appear || {}, n = 0;
+      for (var k in a) if (a[k] <= 10) n++;
+      return n;
+    },
     dueList: function () {
       var out = [], now = Date.now(), d = g.ZStore.data.chars;
       for (var k in d) {

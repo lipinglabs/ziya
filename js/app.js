@@ -185,7 +185,8 @@
     return '<section class="parent">' +
       '<h1>家长面板</h1>' +
       '<div class="card"><h3>掌握度分布</h3>' + bars +
-      '<p class="tiny">已开始 ' + st.started + ' 字 · 掌握（5 级）' + (dist[5] || 0) + ' 字</p></div>' +
+      '<p class="tiny">已开始 ' + st.started + ' 字 · 掌握（5 级）' + (dist[5] || 0) + ' 字 · ' +
+      '仍在提示期 ' + SRS.hintCount() + ' 字（第 11 次出现后自动撤掉）</p></div>' +
       '<div class="card"><h3>错字榜</h3><div class="chips">' + mis + '</div></div>' +
       '<div class="card"><h3>近 7 天（分钟）</h3><div class="chart">' + chart + '</div></div>' +
       '<div class="card"><h3>设置</h3>' +
@@ -486,6 +487,40 @@
     if (App.screen === 'stroke') mountStroke();
   }
 
+  /* ---------------- 新手提示 ----------------
+     孩子还不识字，一上来四选一只能靠猜。所以每个字前 10 次出现，
+     进入题目 3 秒后给一个轻微的视觉提示（标出正确项），第 11 次起撤掉。
+     提示不是直接给答案的文字，只是一个柔和的圈，答对后照样要听读音。 */
+  var HINT_AFTER = 3000;    /* 进入题目多少毫秒后出现 */
+  var HINT_TIMES = 10;      /* 前多少次出现给提示 */
+  var hintTimer = null;
+
+  function clearHint() {
+    if (hintTimer) { clearTimeout(hintTimer); hintTimer = null; }
+    var hs = stage.querySelectorAll('.opt.hint');
+    for (var i = 0; i < hs.length; i++) hs[i].classList.remove('hint');
+  }
+
+  function armHint() {
+    clearHint();
+    var qq = cur();
+    if (!qq || !qq.target || !Gen.byChar(qq.target)) return;   /* 只对汉字题生效 */
+    /* 声调题的选项本身就是音高曲线，看图就能选，圈答案反而废掉了耳朵训练 */
+    if (qq.type === 'tone') return;
+    var n = SRS.touch(qq.target);
+    if (n > HINT_TIMES) return;
+    hintTimer = setTimeout(function () {
+      hintTimer = null;
+      if (App.screen !== 'play' || App.locked) return;
+      var q = cur();
+      if (!q) return;
+      var idx = -1;
+      for (var i = 0; i < q.options.length; i++) if (q.options[i].ok) idx = i;
+      var os = stage.querySelectorAll('.opt');
+      if (idx >= 0 && os[idx]) os[idx].classList.add('hint');
+    }, HINT_AFTER);
+  }
+
   function autoSpeak() {
     var qq = cur();
     if (!qq) return;
@@ -525,6 +560,7 @@
     if (!App.qs.length) { App.screen = 'home'; render(); return; }
     App.screen = 'play';
     render();
+    armHint();
     var packs = (mod === 'm3sym' || mod === 'm3blend') ? PH.packsOf(App.qs) : Gen.packsOf(App.qs);
     A.preload(packs).then(function () {
       A.play('u11');
@@ -539,6 +575,7 @@
     App.locked = false;
     if (App.qi >= App.qs.length) return finish();
     render();
+    armHint();
     autoSpeak();
   }
 
@@ -571,6 +608,7 @@
 
   function choose(i) {
     if (App.locked) return;
+    clearHint();
     var qq = cur();
     var o = qq.options[i];
     if (!o) return;
@@ -604,6 +642,7 @@
       if (!t) return;
       var act = t.getAttribute('data-act');
       if (act === 'back') {
+        clearHint();
         if (App.screen === 'readd') { App.screen = 'read'; }
         else { App.screen = 'home'; }
         render();
