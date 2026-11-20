@@ -27,6 +27,7 @@
       if (A.muted || !k) return null;
       var uri = A.bank[k];
       if (!uri) return null;
+      A.stopExcept(k);          /* 单声道：新声音响起前先掐掉旧的，杜绝叠音 */
       try {
         var a = A.cache[k];
         if (!a) {
@@ -44,7 +45,33 @@
       } catch (e) { return null; }
     },
     stop: function () {
-      for (var k in A.cache) { try { A.cache[k].pause(); } catch (e) { } }
+      for (var k in A.cache) {
+        try { A.cache[k].pause(); A.cache[k].currentTime = 0; } catch (e) { }
+      }
+    },
+    stopExcept: function (keep) {
+      for (var k in A.cache) {
+        if (k === keep) continue;
+        try {
+          if (!A.cache[k].paused) { A.cache[k].pause(); A.cache[k].currentTime = 0; }
+        } catch (e) { }
+      }
+    },
+    /* 播完再回调：用于「鼓励语说完才进下一题」，避免压住题干 */
+    playThen: function (k, cb) {
+      var a = A.play(k);
+      var done = false;
+      function fin() {
+        if (done) return;
+        done = true;
+        if (cb) cb();
+      }
+      if (!a) { setTimeout(fin, 120); return; }
+      a.addEventListener('ended', fin, { once: true });
+      var sec = (isFinite(a.duration) && a.duration > 0)
+        ? a.duration
+        : (A.dur[k] || 1.6);
+      setTimeout(fin, sec * 1000 + 420);   /* 兜底：ended 不触发也不会卡住 */
     },
     /* 顺序播放一串音频，用于「先听题、再听三个选项」 */
     sequence: function (keys, gap, onEach, onDone) {

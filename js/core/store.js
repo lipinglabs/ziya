@@ -1,6 +1,10 @@
-/* 本地存档：localStorage + 导入导出。换设备不丢进度。 */
+/* 本地存档：localStorage + 导入导出。换设备不丢进度。
+   两套数据完全隔离：正式进度 ziya.v1 / 试用沙盒 ziya.sandbox.v1。
+   试用模式下所有写入只落在沙盒键上，不会污染孩子的真实学习数据。 */
 (function (g) {
-  var KEY = 'ziya.v1';
+  var REAL = 'ziya.v1';
+  var SAND = 'ziya.sandbox.v1';
+  var MODE = 'ziya.mode';
 
   function blank() {
     return {
@@ -16,9 +20,15 @@
 
   var S = {
     data: null,
+    sandbox: false,
+    key: function () { return S.sandbox ? SAND : REAL; },
+    boot: function () {
+      try { S.sandbox = localStorage.getItem(MODE) === 'sandbox'; } catch (e) { S.sandbox = false; }
+      return S.load();
+    },
     load: function () {
       try {
-        var raw = localStorage.getItem(KEY);
+        var raw = localStorage.getItem(S.key());
         S.data = raw ? JSON.parse(raw) : blank();
       } catch (e) { S.data = blank(); }
       if (!S.data.settings) S.data.settings = { pinyin: false, muted: false, age: '4' };
@@ -28,7 +38,12 @@
       return S.data;
     },
     save: function () {
-      try { localStorage.setItem(KEY, JSON.stringify(S.data)); } catch (e) { }
+      try { localStorage.setItem(S.key(), JSON.stringify(S.data)); } catch (e) { }
+    },
+    setSandbox: function (on) {
+      S.sandbox = !!on;
+      try { localStorage.setItem(MODE, S.sandbox ? 'sandbox' : 'real'); } catch (e) { }
+      S.load();
     },
     today: function () {
       var d = new Date();

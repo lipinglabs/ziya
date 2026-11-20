@@ -200,6 +200,9 @@
       '<input type="checkbox" id="sw-pinyin"' + (S.data.settings.pinyin ? ' checked' : '') + '>' +
       '<i class="sw"></i></label>' +
       '<p class="tiny">打开后，认字里会出现「看字选读音」题型。建议满 5 岁再开。</p>' +
+      '<label class="row"><span>试用模式（沙盒）</span>' +
+      '<input type="checkbox" id="sw-sandbox"' + (S.sandbox ? ' checked' : '') + '><i class="sw"></i></label>' +
+      '<p class="tiny">打开后所有操作只写进独立沙盒，孩子的真实进度完全不受影响。自己测试、演示给孩子看，用它。</p>' +
       '<label class="row"><span>静音</span>' +
       '<input type="checkbox" id="sw-mute"' + (S.data.settings.muted ? ' checked' : '') + '><i class="sw"></i></label>' +
       '</div>' +
@@ -208,7 +211,7 @@
       '<button class="ghost" data-act="export">导出备份</button>' +
       '<button class="ghost" data-act="import">导入备份</button>' +
       '<input type="file" id="f-import" accept="application/json" hidden>' +
-      '<button class="ghost danger" data-act="reset">清空</button>' +
+      '<button class="ghost danger" data-act="reset">' + (S.sandbox ? '清空沙盒' : '清空') + '</button>' +
       '</div><p class="tiny">换设备前先导出，新设备导入即可继续。</p></div>' +
       '<p class="tiny center">字芽 v0.4 · ' + D.items.length + ' 字 · ' + Object.keys(g.ZY_IMG || {}).length +
       ' 图 · 本地存储</p>' +
@@ -471,10 +474,13 @@
                   : App.screen === 'map' ? viewMap()
                   : App.screen === 'read' ? viewRead()
                   : App.screen === 'readd' ? viewReadDetail() : viewParent();
-    var backable = ['m3', 'blend', 'stroke', 'read', 'readd', 'more', 'parent', 'map', 'cards'].indexOf(App.screen) >= 0;
-    stage.innerHTML = (backable
+    document.body.setAttribute('data-sandbox', S.sandbox ? '1' : '');
+    var backable = ['m3', 'blend', 'stroke', 'read', 'readd', 'more', 'parent', 'map', 'cards', 'play'].indexOf(App.screen) >= 0;
+    var ribbon = S.sandbox
+      ? '<div class="sandboxbar">试用模式 · 不会写入孩子的学习进度</div>' : '';
+    stage.innerHTML = ribbon + (backable
       ? '<div class="navrow"><button class="ghost" data-act="back">' +
-        (App.screen === 'readd' ? '← 全部句子' : '← 回家') + '</button></div>'
+        (App.screen === 'readd' ? '← 全部句子' : App.screen === 'play' ? '← 退出' : '← 回家') + '</button></div>'
       : '') + body;
     document.body.setAttribute('data-screen', App.screen);
     if (App.screen === 'stroke') mountStroke();
@@ -556,12 +562,18 @@
     A.play(elapsed > TIME_LIMIT ? 'u18' : 'u09');
   }
 
+  /* 语音排队：先读被选中的字，再播鼓励，最后才进下一题。
+     以前是「鼓励语 + 下一题题干」同时响，孩子听不清。 */
+  function speakThenAdvance(first, then) {
+    if (first) A.playThen(first, function () { A.playThen(then, next); });
+    else A.playThen(then, next);
+  }
+
   function choose(i) {
     if (App.locked) return;
     var qq = cur();
     var o = qq.options[i];
     if (!o) return;
-    if (o.audio) A.play(o.audio);
 
     var btns = stage.querySelectorAll('.opt');
     if (o.ok) {
@@ -569,8 +581,7 @@
       btns[i].classList.add('ok');
       if (App.tries === 0) App.right++;
       App.log.push({ c: qq.target, ok: App.tries === 0 });
-      A.play(App.tries === 0 ? (Math.random() < 0.5 ? 'u01' : 'u02') : 'u03');
-      setTimeout(next, 950);
+      speakThenAdvance(o.audio, App.tries === 0 ? (Math.random() < 0.5 ? 'u01' : 'u02') : 'u03');
     } else {
       App.tries++;
       btns[i].classList.add('bad');
@@ -579,8 +590,7 @@
         App.locked = true;
         App.log.push({ c: qq.target, ok: false });
         for (var j = 0; j < qq.options.length; j++) if (qq.options[j].ok) btns[j].classList.add('reveal');
-        A.play('u12');
-        setTimeout(next, 1700);
+        A.playThen('u12', next);
       } else {
         A.play('u05');
       }
@@ -688,6 +698,13 @@
         A.muted = e.target.checked;
         S.save();
       }
+      if (id === 'sw-sandbox') {
+        S.setSandbox(e.target.checked);
+        A.muted = !!S.data.settings.muted;
+        App.screen = 'parent';        /* 切换后留在面板，方便再切回来 */
+        App.mod = '';
+        render();
+      }
       if (id === 'f-import' && e.target.files && e.target.files[0]) {
         var fr = new FileReader();
         fr.onload = function () {
@@ -718,7 +735,7 @@
   /* ---------------- 启动 ---------------- */
   function boot() {
     stage = q('#stage');
-    S.load();
+    S.boot();
     A.muted = !!S.data.settings.muted;
     Gen.init();
     if (PH) PH.init();

@@ -424,3 +424,13 @@ input:checked + .sw::after { transform: translateX(20px); }
   .pc-py { font-size: 10pt; color: #555; }
   .pc-img { width: 26mm; height: 26mm; }
 }
+
+/* ---------- 试用模式提示条 ---------- */
+.sandboxbar {
+  position: fixed; left: 0; right: 0; top: 0; z-index: 60;
+  background: var(--amber); color: #fff;
+  font-size: 12px; letter-spacing: .5px; text-align: center;
+  padding: 6px 10px; box-shadow: 0 1px 6px rgba(0,0,0,.08);
+}
+body[data-sandbox="1"] #stage { padding-top: 62px; }
+body[data-sandbox="1"] .sandboxbar { display: block; }
