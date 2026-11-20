@@ -1,5 +1,5 @@
 /* 字芽 Service Worker：应用外壳预缓存 + 运行时缓存，首次打开后完全离线可玩。 */
-const VERSION = 'ziya-v1';
+const VERSION = 'ziya-v6';
 const CORE = [
   './',
   'index.html',
@@ -10,7 +10,12 @@ const CORE = [
   'js/core/store.js',
   'js/core/srs.js',
   'js/core/audio.js',
+  'js/core/strokes.js',
+  'js/vendor/hanzi-writer.min.js',
+  'js/data/pinyin-data.js',
+  'js/data/reads.js',
   'js/game/gen.js',
+  'js/game/pinyin.js',
   'js/app.js',
   'audio/ui.js',
   'audio/g01.js',

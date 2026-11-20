@@ -114,7 +114,7 @@
       audio: akey(target.c, 'c'),
       prompt: { kind: 'char', text: target.c },
       options: shuffle([target].concat(ds)).map(function (it) {
-        return { label: it.p, ok: it.c === target.c, audio: akey(it.c, 'c') };
+        return { label: it.p, ok: it.c === target.c, audio: hasSolo(it.c) ? akey(it.c, 'c') : null };
       })
     };
   }
@@ -189,7 +189,9 @@
 
   function qTone(target) {
     if ([1, 2, 4].indexOf(target.tone) < 0) {
-      var p = near(target, 8, function (it) { return it.tone === 1 || it.tone === 2 || it.tone === 4; });
+      var p = near(target, 8, function (it) {
+        return (it.tone === 1 || it.tone === 2 || it.tone === 4) && hasSolo(it.c);
+      });
       if (!p.length) return null;
       target = p[0];
     }
@@ -251,6 +253,7 @@
 
   g.ZYGen = {
     init: init, akey: akey, packOf: packOf, packsOf: packsOf,
+    byChar: function (c) { return BY[c]; },
     lessonM1: lessonM1, lessonM2: lessonM2
   };
 })(window);

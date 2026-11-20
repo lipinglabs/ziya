@@ -10,32 +10,40 @@
 
 **为什么 4 岁不教拼音**：拼音是抽象符号系统，前置能力是「音素意识」（押韵、首音、音节切分、声调），多数儿童 5 岁后才成熟。4 岁硬上，典型结果是 b/d、p/q 反复分不清，形成「学习=难受」的初始印象。
 
-## 现状（v0.1）
+## 模块与状态
 
-| 模块 | 状态 |
-|---|---|
-| M1 识字 · 300 字 / 30 主题组 | 已实现（4 种题型，拼音题型由开关控制） |
-| M2 语音意识 · 押韵 / 首音 / 音节 / 声调 | 已实现（程序化出题，无限关） |
-| M3 拼音（63 符号 + 300 音节） | 未开始，计划 2027 年秋 |
-| M4 笔顺描红 | 未开始 |
-| M5 阅读短句 | 未开始 |
+| 模块 | 内容 | 状态 |
+|---|---|---|
+| M1 识字 | 310 字 / 31 主题组，4 种题型 | 完成 |
+| M2 语音意识 | 押韵 / 首音 / 音节 / 声调，程序化出题 | 完成 |
+| M3 拼音 | 63 符号认读 + 易混辨音 + 声母/韵母填空 + 拼读机 | 完成（家长开关控制入口） |
+| M4 描红 | 310 字笔顺动画 + 指写练习（Hanzi Writer） | 完成 |
+| M5 阅读 | 43 句短句，全部落在已学字内，音频自动指读 | 完成 |
 
 ## 目录
 
 ```
-index.html          壳
-css/app.css         全部样式
-js/data/chars.js    300 字表（唯一内容源）
-js/core/pinyin.js   拼音解析：声母/韵母/声调/押韵
-js/core/store.js    localStorage 存档 + 导入导出
-js/core/srs.js      间隔重复引擎（掌握度 0-5，1/3/7/15/30 天）
-js/core/audio.js    音频包懒加载与播放
-js/game/gen.js      题目生成器（从字表推导，不预写题库）
-js/app.js           界面与流程
-audio/gNN.js        每 10 字一个音频包（base64 data URI）
-audio/src/*.mp3     音频母版，不入库
-sw.js               离线缓存
-tools/              生产与发布工具
+index.html             壳
+css/app.css            全部样式
+js/data/chars.js       310 字表（唯一内容源）
+js/data/pinyin-data.js 63 个拼音符号（含 TTS 呼读音映射）
+js/data/reads.js       43 句阅读短句
+js/core/pinyin.js      拼音解析：声母/韵母/声调/押韵
+js/core/store.js       localStorage 存档 + 导入导出
+js/core/srs.js         间隔重复引擎（掌握度 0-5，1/3/7/15/30 天）
+js/core/audio.js       音频包懒加载与播放
+js/core/strokes.js     笔顺包懒加载
+js/game/gen.js         M1/M2 题目生成器（从字表推导，不预写题库）
+js/game/pinyin.js      M3 拼音与拼读
+js/vendor/             Hanzi Writer（MIT）
+js/app.js              界面与流程
+audio/gNN.js           每 10 字一个音频包（base64 data URI）
+audio/py1.js py2.js    63 个拼音符号音频
+audio/rd.js            43 句阅读音频
+audio/ui.js            20 条界面语音
+strokes/gNN.js         每 10 字一个笔顺包
+tools/                 生产与发布工具（不入库）
+sw.js                  离线缓存（改版必须改 VERSION）
 ```
 
 ## 铁律（继承自 lilearn-english）
@@ -44,23 +52,28 @@ tools/              生产与发布工具
 2. **凭据不进仓库**：豆包 TTS 的 Key 只从环境变量或 `~/.workbuddy/secrets/doubao.env` 读取。
 3. **禁止 `git push`**：本机推送被网络拦截，必须用 `tools/publish.js` 走 GitHub Data API。
 4. 本项目为中文识字内容，属「沉浸感铁律（纯英文）」的**明确例外**。
+5. **每次发版必须改 `sw.js` 的 `VERSION`**，否则老用户会一直跑缓存里的旧版。
 
 ## 常用命令
 
 ```bash
-node tools/check_data.js        # 字表自检（改字后必跑）
-python tools/gen_audio.py       # 生成缺失语音并重新打包 audio/*.js
-python tools/gen_audio.py --pack-only
-node tools/publish.js           # 走 Data API 发布到 GitHub Pages
-python -m http.server 8777      # 本地预览
+node tools/serve.js 8788          # 本地开发（no-store，避免缓存坑）
+node tools/check_data.js          # 字表自检（改字后必跑）
+node tools/test_gen.js            # 出题自检：答案唯一、选项不重复、音频齐全
+node tools/check_reads.js         # 阅读自检：每句只能在 310 字内
+python tools/gen_audio.py         # 生成缺失语音并重新打包 audio/*.js
+node tools/fetch_strokes.js       # 下载笔顺数据并打包 strokes/*.js
+node tools/publish.js             # 走 Data API 发布到 GitHub Pages
 ```
 
 ## 设计要点
 
 - **间隔重复取代通关制**：每个字有独立掌握度，每次打开看到的是「今天该复习什么」，不是「上次玩到第几关」。
+- **题目由数据推导**：改一个字表读音，全部题目自动跟着变，不存在「背题库」。
+- **拼读不另做音频**：M3 拼读机直接复用 310 字的读音，做到「拼出来的音就是一个真的字」，拼音与识字当场打通。
+- **多音字不进单字音频**：`数`、`只` 孤立朗读会读错，出题自动改走词音频。
 - **错题不惩罚**：答错只重听、再试一次；两次未对自动揭示答案，永不卡住。
 - **单次 12 分钟**：到点温和收尾。
-- **零网络依赖**：全部资源本地，PWA 首次打开后离线可玩。
 
 ## 数据
 

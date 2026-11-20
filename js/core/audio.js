@@ -6,6 +6,7 @@
     loaded: {},
     muted: false,
     cache: {},
+    dur: {},
     loadPack: function (id) {
       if (A.loaded[id]) return A.loaded[id];
       A.loaded[id] = new Promise(function (resolve) {
@@ -23,16 +24,24 @@
     has: function (k) { return !!A.bank[k]; },
     /* 同步触发播放：必须在用户手势里调用，iOS 才允许出声 */
     play: function (k) {
-      if (A.muted || !k) return;
+      if (A.muted || !k) return null;
       var uri = A.bank[k];
-      if (!uri) return;
+      if (!uri) return null;
       try {
         var a = A.cache[k];
-        if (!a) { a = new Audio(uri); A.cache[k] = a; }
+        if (!a) {
+          a = new Audio(uri);
+          A.cache[k] = a;
+          a.addEventListener('loadedmetadata', function () {
+            if (isFinite(a.duration)) A.dur[k] = a.duration;
+          }, { once: true });
+        }
+        if (isFinite(a.duration) && a.duration > 0) A.dur[k] = a.duration;
         a.currentTime = 0;
         var p = a.play();
         if (p && p.catch) p.catch(function () { });
-      } catch (e) { }
+        return a;
+      } catch (e) { return null; }
     },
     stop: function () {
       for (var k in A.cache) { try { A.cache[k].pause(); } catch (e) { } }

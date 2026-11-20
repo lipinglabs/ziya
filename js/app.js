@@ -2,6 +2,7 @@
    设计约束：4 岁，不识字也能玩；单次 12 分钟；错题不惩罚，只重听。 */
 (function (g) {
   var D = g.ZIYA_DATA, S = g.ZStore, SRS = g.ZSRS, A = g.ZYAudio, Gen = g.ZYGen;
+  var PH = g.ZYPhonics, PY = g.ZPY;
   var TIME_LIMIT = 12 * 60 * 1000;
   var stage = null;
 
@@ -10,6 +11,7 @@
     mod: 'm1',
     qs: [], qi: 0, tries: 0, right: 0,
     locked: false, t0: 0, revealed: false,
+    m3group: 'dan', blend: { ini: null, fin: null }, read: null, stroke: { list: [], i: 0 },
     log: []
   };
 
@@ -41,13 +43,18 @@
       '<p class="lede">今天 <b>' + Math.min(5, fresh) + '</b> 个新字，<b>' + due + '</b> 个要复习</p>' +
       '<button class="big primary" data-act="go" data-mod="m1">' +
       '<span class="glyph">认</span><span class="lbl">认字</span>' +
-      '<span class="sub">' + st.started + ' / 300 字 已开始</span></button>' +
+      '<span class="sub">' + st.started + ' / ' + D.items.length + ' 字 已开始</span></button>' +
       '<button class="big" data-act="go" data-mod="m2">' +
       '<span class="glyph">听</span><span class="lbl">听音游戏</span>' +
       '<span class="sub">押韵 · 声调 · 音节</span></button>' +
+      (S.data.settings.pinyin
+        ? '<button class="big" data-act="m3"><span class="glyph">拼</span><span class="lbl">拼音</span>' +
+          '<span class="sub">63 个符号 · 拼一拼</span></button>'
+        : '') +
       '<div class="foot">' +
       '<span class="tiny">今天玩了 ' + Math.round(today.sec / 60) + ' 分钟</span>' +
-      '<button class="ghost" data-act="parent">家长</button>' +
+      '<span class="footbtns"><button class="ghost" data-act="more">更多</button>' +
+      '<button class="ghost" data-act="parent">家长</button></span>' +
       '</div></section>';
   }
 
@@ -55,6 +62,13 @@
   function cur() { return App.qs[App.qi]; }
 
   function viewPrompt(p) {
+    if (p.kind === 'gap') {
+      var L = p.left ? '<span>' + p.left + '</span>' : '<span class="blank"></span>';
+      var R = p.right ? '<span>' + p.right + '</span>' : '<span class="blank"></span>';
+      return '<div class="prompt"><div class="bigchar">' + p.char + '</div>' +
+        '<div class="gap-py">' + L + R + '</div>' +
+        '<div class="psub">听一听，再选</div></div>';
+    }
     if (p.kind === 'char') {
       return '<div class="prompt"><div class="bigchar">' + p.text + '</div>' +
         (p.sub ? '<div class="psub">' + p.sub + '</div>' : '') + '</div>';
@@ -74,7 +88,8 @@
     var cls = 'opts n' + n + (qq.type === 'match' || qq.type === 'read' ? ' text' : '');
     var body = qq.options.map(function (o, i) {
       var inner;
-      if (o.big) inner = '<span class="opt-char">' + o.label + '</span>';
+      if (o.py) inner = '<span class="opt-py">' + o.label + '</span>';
+      else if (o.big) inner = '<span class="opt-char">' + o.label + '</span>';
       else if (o.dots) inner = '<span class="opt-dots">' + dots(o.dots) + '</span>';
       else if (o.d) inner = toneSVG(o.d) + '<span class="opt-word">' + o.t + '</span>';
       else inner = '<span class="opt-word">' + o.label + '</span>';
@@ -177,13 +192,216 @@
       '</section>';
   }
 
+  /* ---------------- 拼音 ---------------- */
+  function viewM3() {
+    var cards = PY.groups.map(function (gid) {
+      var items = PY.inGroup(gid);
+      var sample = items.slice(0, 6).map(function (x) { return x.s; }).join(' ');
+      return '<button class="mcard" data-act="go" data-mod="m3sym" data-g="' + gid + '">' +
+        '<b>' + PY.groupName(gid) + '</b>' +
+        '<span>' + items.length + ' 个</span>' +
+        '<em>' + sample + '</em></button>';
+    }).join('');
+    cards += '<button class="mcard all" data-act="go" data-mod="m3sym" data-g="all">' +
+      '<b>全部复习</b><span>63 个</span><em>随机抽查</em></button>';
+    return '<section class="m3">' +
+      '<h1>拼音</h1>' +
+      '<p class="lede">先听声音，再看符号。拼出来的音，就是一个真的字。</p>' +
+      '<div class="mgrid">' + cards + '</div>' +
+      '<button class="big primary" data-act="go" data-mod="m3blend">' +
+      '<span class="glyph">拼</span><span class="lbl">拼读闯关</span>' +
+      '<span class="sub">补声母 · 补韵母</span></button>' +
+      '<button class="big" data-act="blend">' +
+      '<span class="glyph">合</span><span class="lbl">拼读机</span>' +
+      '<span class="sub">自己拼，拼出真的字</span></button>' +
+      '</section>';
+  }
+
+  function viewBlend() {
+    var b = App.blend;
+    var syl = '', ch = '', hint = '选一个声母，再选一个韵母';
+    if (b.ini && b.fin) {
+      var item = PH.blend[b.ini + '|' + b.fin];
+      if (item) { syl = item.p; ch = item.c; hint = '拼出来是「' + item.c + '」'; }
+      else { hint = '这个音还没收进字表，换一个试试'; }
+    } else if (b.ini) hint = '再选一个韵母';
+    else if (b.fin) hint = '先选一个声母';
+
+    function chips(list, act, cur) {
+      return list.map(function (s) {
+        return '<button class="chipbtn' + (cur === s ? ' on' : '') + '" data-act="' + act +
+          '" data-v="' + s + '">' + s + '</button>';
+      }).join('');
+    }
+
+    return '<section class="blend">' +
+      '<h1>拼读机</h1>' +
+      '<div class="bresult">' +
+      '<div class="bformula">' +
+      '<span class="bslot' + (b.ini ? ' on' : '') + '">' + (b.ini || '?') + '</span>' +
+      '<span class="bop">+</span>' +
+      '<span class="bslot' + (b.fin ? ' on' : '') + '">' + (b.fin || '?') + '</span>' +
+      '<span class="bop">=</span>' +
+      '<span class="bsyl">' + syl + '</span>' +
+      '</div>' +
+      '<div class="bchar' + (ch ? ' pop' : '') + '">' + ch + '</div>' +
+      '<div class="psub">' + hint + '</div>' +
+      '<button class="ghost" data-act="blend-reset">重选</button>' +
+      '</div>' +
+      '<div class="bgroup"><h3>声母 23</h3><div class="chips">' + chips(PH.inis(), 'ini', b.ini) + '</div></div>' +
+      '<div class="bgroup"><h3>韵母 24</h3><div class="chips">' + chips(PH.fins(), 'fin', b.fin) + '</div></div>' +
+      '</section>';
+  }
+
+  /* ---------------- 更多 / 描红 ---------------- */
+  function viewMore() {
+    return '<section class="more">' +
+      '<h1>更多</h1>' +
+      '<button class="big" data-act="stroke"><span class="glyph">写</span>' +
+      '<span class="lbl">描一描</span><span class="sub">看笔顺，跟着写</span></button>' +
+      '<button class="big" data-act="read"><span class="glyph">读</span>' +
+      '<span class="lbl">读一读</span><span class="sub">用学过的字读短句</span></button>' +
+      '</section>';
+  }
+
+  function strokeList() {
+    var learned = D.items.filter(function (it) {
+      var r = S.data.chars[it.c];
+      return r && r.lvl >= 1 && r.lvl <= 3;
+    });
+    if (learned.length < 6) {
+      learned = learned.concat(D.items.filter(function (it) {
+        var r = S.data.chars[it.c];
+        return (!r || r.lvl === 0) && learned.indexOf(it) < 0;
+      }).slice(0, 6 - learned.length));
+    }
+    return learned.slice(0, 6).map(function (it) { return it.c; });
+  }
+
+  function viewStroke() {
+    var st = App.stroke, ch = st.list[st.i], it = Gen.byChar(ch);
+    var prog = '';
+    for (var i = 0; i < st.list.length; i++) prog += '<b class="' + (i === st.i ? 'now' : i < st.i ? 'done' : '') + '"></b>';
+    return '<section class="stroke">' +
+      '<div class="dots">' + prog + '</div>' +
+      '<div class="sphead"><span class="sppy">' + (it ? it.p : '') +
+      (it ? ' · ' + it.w[0] : '') + '</span></div>' +
+      '<div class="hw" id="hw"></div>' +
+      '<div class="spbtns">' +
+      '<button class="ghost" data-act="st-play">再看一遍</button>' +
+      '<button class="ghost primary-ghost" data-act="st-trace">描一描</button>' +
+      '</div>' +
+      '<div class="spnav">' +
+      '<button class="ghost" data-act="st-prev"' + (st.i === 0 ? ' disabled' : '') + '>上一个</button>' +
+      '<span class="tiny">' + (st.i + 1) + ' / ' + st.list.length + '</span>' +
+      '<button class="ghost" data-act="st-next"' + (st.i === st.list.length - 1 ? ' disabled' : '') + '>下一个</button>' +
+      '</div></section>';
+  }
+
+  function mountStroke() {
+    var ch = App.stroke.list[App.stroke.i];
+    var it = Gen.byChar(ch);
+    if (!it) return;
+    var gid = 'g' + (Math.floor(it.i / 10) + 1 < 10 ? '0' : '') + (Math.floor(it.i / 10) + 1);
+    g.ZStroke.load(gid).then(function () {
+      var el = document.getElementById('hw');
+      if (!el) return;
+      el.innerHTML = '';
+      if (!g.ZY_STROKES || !g.ZY_STROKES[ch] || !g.HanziWriter) {
+        el.innerHTML = '<p class="tiny">这个字的笔顺还没有</p>';
+        return;
+      }
+      var w = Math.min(300, (stage.clientWidth || 360) - 70);
+      el.style.width = w + 'px';
+      el.style.height = w + 'px';
+      App.writer = g.HanziWriter.create(el, ch, {
+        width: w, height: w, padding: 4, showOutline: true,
+        strokeColor: '#2E2A26', radicalColor: '#2F7A66',
+        outlineColor: '#E7DFD2', highlightColor: '#E08A3C',
+        drawingColor: '#2F7A66', drawingWidth: 18,
+        strokeAnimationSpeed: 1, delayBetweenStrokes: 260,
+        charDataLoader: function (c, onComplete) { onComplete(g.ZY_STROKES[c]); }
+      });
+      App.writer.animateCharacter();
+    });
+  }
+
+  /* ---------------- 阅读 ---------------- */
+  function viewRead() {
+    var groups = {}, order = [];
+    g.ZREADS.forEach(function (r) {
+      if (!groups[r.tag]) { groups[r.tag] = []; order.push(r.tag); }
+      groups[r.tag].push(r);
+    });
+    var html = order.map(function (tag) {
+      return '<div class="rgroup"><h3>' + tag + '</h3><div class="rgrid">' +
+        groups[tag].map(function (r) {
+          return '<button class="rcard" data-act="r-open" data-k="' + r.k + '">' + r.t + '</button>';
+        }).join('') + '</div></div>';
+    }).join('');
+    return '<section class="read"><h1>读一读</h1>' +
+      '<p class="lede">每一句都只用你学过的字，可以自己读下来。</p>' + html + '</section>';
+  }
+
+  function viewReadDetail() {
+    var r = App.read;
+    if (!r) return viewRead();
+    var spans = [].map.call(r.t, function (c, i) {
+      var isHan = /[\u4e00-\u9fa5]/.test(c);
+      return '<span class="rc' + (isHan ? '' : ' punct') + '">' + c + '</span>';
+    }).join('');
+    return '<section class="readd">' +
+      '<div class="rline" id="rline">' + spans + '</div>' +
+      '<div class="psub">跟着亮起来的字读</div>' +
+      '<div class="spbtns"><button class="ghost primary-ghost" data-act="r-play">再读一遍</button></div>' +
+      '<div class="rnav">' +
+      '<button class="ghost" data-act="r-prev"' + (r.i === 0 ? ' disabled' : '') + '>上一句</button>' +
+      '<button class="ghost" data-act="r-next"' + (r.i === g.ZREADS.length - 1 ? ' disabled' : '') + '>下一句</button>' +
+      '</div></section>';
+  }
+
+  /* 指读：按音频时长均分，逐字点亮 */
+  function playRead() {
+    var r = App.read;
+    if (!r) return;
+    var spans = stage.querySelectorAll('.rc');
+    var han = [].filter.call(spans, function (s) { return !s.classList.contains('punct'); });
+    for (var i = 0; i < spans.length; i++) spans[i].classList.remove('on');
+    if (!han.length) return;
+    A.loadPack('rd').then(function () {
+      var a = A.play(r.k);
+      var dur = A.dur[r.k] || (han.length * 0.62);
+      var step = Math.max(0.35, (dur - 0.25) / han.length);
+      han.forEach(function (s, i) {
+        setTimeout(function () {
+          for (var j = 0; j < han.length; j++) han[j].classList.remove('on');
+          s.classList.add('on');
+        }, 150 + i * step * 1000);
+      });
+      setTimeout(function () {
+        for (var j = 0; j < han.length; j++) han[j].classList.remove('on');
+      }, 150 + han.length * step * 1000 + 300);
+    });
+  }
+
   /* ---------------- 渲染 ---------------- */
   function render() {
     var body = App.screen === 'home' ? viewHome()
       : App.screen === 'play' ? viewPlay()
-        : App.screen === 'done' ? viewDone() : viewParent();
-    stage.innerHTML = body;
+        : App.screen === 'done' ? viewDone()
+        : App.screen === 'm3' ? viewM3()
+          : App.screen === 'blend' ? viewBlend()
+            : App.screen === 'more' ? viewMore()
+              : App.screen === 'stroke' ? viewStroke()
+                : App.screen === 'read' ? viewRead()
+                  : App.screen === 'readd' ? viewReadDetail() : viewParent();
+    var backable = ['m3', 'blend', 'stroke', 'read', 'readd', 'more', 'parent'].indexOf(App.screen) >= 0;
+    stage.innerHTML = (backable
+      ? '<div class="navrow"><button class="ghost" data-act="back">' +
+        (App.screen === 'readd' ? '← 全部句子' : '← 回家') + '</button></div>'
+      : '') + body;
     document.body.setAttribute('data-screen', App.screen);
+    if (App.screen === 'stroke') mountStroke();
   }
 
   function autoSpeak() {
@@ -206,17 +424,20 @@
   }
 
   /* ---------------- 流程 ---------------- */
-  function start(mod) {
+  function start(mod, groupId) {
     App.mod = mod;
     App.t0 = Date.now();
     App.qi = 0; App.right = 0; App.tries = 0; App.locked = false; App.log = [];
-    App.qs = mod === 'm1'
-      ? Gen.lessonM1(SRS.queue(8, 5), !!S.data.settings.pinyin)
-      : Gen.lessonM2(8);
+    if (groupId) App.m3group = groupId;
+    if (mod === 'm1') App.qs = Gen.lessonM1(SRS.queue(8, 5), !!S.data.settings.pinyin);
+    else if (mod === 'm2') App.qs = Gen.lessonM2(8);
+    else if (mod === 'm3sym') App.qs = PH.lessonSymbols(App.m3group || 'dan');
+    else App.qs = PH.lessonBlend(8);
     if (!App.qs.length) { App.screen = 'home'; render(); return; }
     App.screen = 'play';
     render();
-    A.preload(Gen.packsOf(App.qs)).then(function () {
+    var packs = (mod === 'm3sym' || mod === 'm3blend') ? PH.packsOf(App.qs) : Gen.packsOf(App.qs);
+    A.preload(packs).then(function () {
       A.play('u11');
       autoSpeak();
     });
@@ -238,6 +459,10 @@
     S.addDone(1);
     if (App.mod === 'm1') {
       App.log.forEach(function (r) { SRS.record(r.c, r.ok); });
+    } else if (App.mod === 'm3sym' || App.mod === 'm3blend') {
+      if (!S.data.m3) S.data.m3 = { right: 0, wrong: 0, plays: 0 };
+      App.log.forEach(function (r) { if (r.ok) S.data.m3.right++; else S.data.m3.wrong++; });
+      S.data.m3.plays++;
     } else {
       App.log.forEach(function (r) { if (r.ok) S.data.m2.right++; else S.data.m2.wrong++; });
       S.data.m2.plays++;
@@ -285,12 +510,63 @@
       var t = e.target.closest('[data-act]');
       if (!t) return;
       var act = t.getAttribute('data-act');
-      if (act === 'go') { start(t.getAttribute('data-mod')); }
+      if (act === 'back') {
+        if (App.screen === 'readd') { App.screen = 'read'; }
+        else { App.screen = 'home'; }
+        render();
+      }
+      else if (act === 'go') { start(t.getAttribute('data-mod'), t.getAttribute('data-g')); }
+      else if (act === 'm3') { App.screen = 'm3'; render(); }
+      else if (act === 'blend') { App.blend = { ini: null, fin: null }; App.screen = 'blend'; render(); A.preload(['py1', 'py2']); }
+      else if (act === 'ini' || act === 'fin') {
+        var v = t.getAttribute('data-v');
+        if (act === 'ini') App.blend.ini = App.blend.ini === v ? null : v;
+        else App.blend.fin = App.blend.fin === v ? null : v;
+        var sy = PY.bySymbol(v);
+        if (sy) A.play(sy.k);
+        var both = App.blend.ini && App.blend.fin;
+        render();
+        if (both) {
+          var hit = PH.blend[App.blend.ini + '|' + App.blend.fin];
+          if (hit) setTimeout(function () { A.play(Gen.akey(hit.c, 'c')); }, 520);
+        }
+      }
+      else if (act === 'blend-reset') { App.blend = { ini: null, fin: null }; render(); }
+      else if (act === 'more') { App.screen = 'more'; render(); }
+      else if (act === 'stroke') {
+        App.stroke = { list: strokeList(), i: 0 };
+        App.screen = 'stroke'; render();
+      }
+      else if (act === 'read') { App.screen = 'read'; render(); }
+      else if (act === 'r-open') {
+        var kk = t.getAttribute('data-k');
+        App.read = g.ZREADS.filter(function (x) { return x.k === kk; })[0];
+        App.screen = 'readd'; render(); playRead();
+      }
+      else if (act === 'r-play') { playRead(); }
+      else if (act === 'r-prev' && App.read && App.read.i > 0) {
+        App.read = g.ZREADS[App.read.i - 1]; render(); playRead();
+      }
+      else if (act === 'r-next' && App.read && App.read.i < g.ZREADS.length - 1) {
+        App.read = g.ZREADS[App.read.i + 1]; render(); playRead();
+      }
+      else if (act === 'st-play') { if (App.writer) App.writer.animateCharacter(); }
+      else if (act === 'st-trace') {
+        if (!App.writer) return;
+        App.writer.quiz({
+          onComplete: function () { A.play('u02'); setTimeout(function () { if (App.writer) App.writer.animateCharacter(); }, 500); }
+        });
+      }
+      else if (act === 'st-prev' && App.stroke.i > 0) { App.stroke.i--; render(); }
+      else if (act === 'st-next' && App.stroke.i < App.stroke.list.length - 1) { App.stroke.i++; render(); }
       else if (act === 'opt') { choose(+t.getAttribute('data-i')); }
       else if (act === 'play') { A.play(t.getAttribute('data-key')); }
-      else if (act === 'home') { App.screen = 'home'; render(); }
+      else if (act === 'home') {
+        App.screen = (App.mod === 'm3sym' || App.mod === 'm3blend') ? 'm3' : 'home';
+        render();
+      }
       else if (act === 'parent') { App.screen = 'parent'; render(); }
-      else if (act === 'again') { start(App.mod); }
+      else if (act === 'again') { start(App.mod, App.m3group); }
       else if (act === 'export') { doExport(); }
       else if (act === 'import') { var f = q('#f-import'); if (f) f.click(); }
       else if (act === 'reset') { doReset(); }
@@ -341,10 +617,12 @@
     S.load();
     A.muted = !!S.data.settings.muted;
     Gen.init();
+    if (PH) PH.init();
     bind();
     render();
     A.preload(['ui', 'g01']);
-    if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) {
+    if ('serviceWorker' in navigator && /^https?:/.test(location.protocol) &&
+      !/^(127\.0\.0\.1|localhost)$/.test(location.hostname)) {
       navigator.serviceWorker.register('sw.js').catch(function () { });
     }
   }
